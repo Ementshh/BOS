@@ -1,103 +1,51 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+// src/contexts/AuthContext.tsx
+import { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  onAuthStateChanged,
+} from 'firebase/auth';
+import { auth } from '../firebase'; // <- you need to create this file
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: 'admin' | 'parent' | 'teacher' | 'student' | 'guest';
-}
+const AuthContext = createContext<any>(null);
 
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string, role: string) => Promise<void>;
-  logout: () => void;
-}
+export const useAuth = () => useContext(AuthContext);
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check if user is stored in localStorage (for demo purposes)
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
-
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      // For demo purposes, we're just setting a mock user
-      // In a real app, this would make an API call
-      const mockUser: User = {
-        id: '1',
-        name: 'Demo User',
-        email: email,
-        role: 'parent',
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   const register = async (name: string, email: string, password: string, role: string) => {
-    setIsLoading(true);
-    try {
-      // For demo purposes, we're just setting a mock user
-      // In a real app, this would make an API call
-      const mockUser: User = {
-        id: '2',
-        name: name,
-        email: email,
-        role: role as any,
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(userCredential.user, { displayName: name });
+    // You can also save "role" in Firestore if needed
+    return userCredential;
+  };
+
+  const login = (email: string, password: string) => {
+    return signInWithEmailAndPassword(auth, email, password);
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
+    return signOut(auth);
   };
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const value = { currentUser, register, login, logout };
+
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      isAuthenticated: !!user, 
-      isLoading, 
-      login, 
-      register, 
-      logout 
-    }}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 };
