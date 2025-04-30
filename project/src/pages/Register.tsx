@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { School, Eye, EyeOff, CheckCircle, User, GraduationCap } from 'lucide-react';
+import { School, Eye, EyeOff, CheckCircle, User, Users, Building, GraduationCap } from 'lucide-react';
 
 const Register: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('parent');
+  const [role, setRole] = useState<'admin' | 'parent' | 'teacher' | 'student' | 'guest'>('parent');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -24,6 +24,9 @@ const Register: React.FC = () => {
     yearsExperience: '',
     certifications: '',
   });
+
+  // Additional student fields
+  const [nisn, setNisn] = useState('');
   
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -39,12 +42,17 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || (role !== 'student' && (!email || !password || !confirmPassword))) {
       setError('Please fill in all required fields');
       return;
     }
     
-    if (password !== confirmPassword) {
+    if (role === 'student' && !nisn) {
+      setError('Please provide your NISN');
+      return;
+    }
+    
+    if (role !== 'student' && password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
@@ -63,7 +71,7 @@ const Register: React.FC = () => {
     setIsLoading(true);
     
     try {
-      await register(name, email, password, role);
+      await register(name, email, password, role, nisn);
       navigate('/');
     } catch (err) {
       setError('Failed to create account');
@@ -75,7 +83,6 @@ const Register: React.FC = () => {
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
-
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -107,7 +114,7 @@ const Register: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 I am a:
               </label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <button
                   type="button"
                   onClick={() => setRole('parent')}
@@ -134,6 +141,19 @@ const Register: React.FC = () => {
                   <span>Teacher</span>
                   {role === 'teacher' && <CheckCircle className="h-5 w-5 ml-2 text-blue-500" />}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('student')}
+                  className={`flex items-center justify-center px-4 py-3 rounded-lg border-2 ${
+                    role === 'student'
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Users className="h-5 w-5 mr-2" />
+                  <span>Student</span>
+                  {role === 'student' && <CheckCircle className="h-5 w-5 ml-2 text-blue-500" />}
+                </button>
               </div>
             </div>
 
@@ -153,64 +173,85 @@ const Register: React.FC = () => {
                 />
               </div>
               
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email Address <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
+              {role !== 'student' && (
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+              )}
             </div>
 
-            {/* Password Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Student-specific Fields */}
+            {role === 'student' && (
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                  Password <span className="text-red-500">*</span>
-                </label>
-                <div className="relative mt-1">
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={togglePasswordVisibility}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5 text-gray-400" />
-                    ) : (
-                      <Eye className="h-5 w-5 text-gray-400" />
-                    )}
-                  </button>
-                </div>
-              </div>
-              
-              <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                  Confirm Password <span className="text-red-500">*</span>
+                <label htmlFor="nisn" className="block text-sm font-medium text-gray-700">
+                  NISN (Number) <span className="text-red-500">*</span>
                 </label>
                 <input
-                  id="confirmPassword"
-                  type="password"
+                  id="nisn"
+                  type="text"
                   required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  value={nisn}
+                  onChange={(e) => setNisn(e.target.value)}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
-            </div>
+            )}
+
+            {/* Password Fields */}
+            {role !== 'student' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                    Password <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative mt-1">
+                    <input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={togglePasswordVisibility}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <Eye className="h-5 w-5 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                    Confirm Password <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Teacher-specific Fields */}
             {role === 'teacher' && (
