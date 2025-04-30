@@ -7,45 +7,109 @@ import {
   updateProfile,
   onAuthStateChanged,
 } from 'firebase/auth';
-import { auth } from '../firebase'; // <- you need to create this file
+import { auth, db } from '../firebase'; 
+import { doc, setDoc } from "firebase/firestore";
 
-const AuthContext = createContext<any>(null);
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'parent' | 'teacher' | 'student' | 'guest';
+}
 
-export const useAuth = () => useContext(AuthContext);
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role: 'admin' | 'parent' | 'teacher' | 'student' | 'guest', nisn?: string) => Promise<void>;
+  logout: () => void;
+}
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-  const register = async (name: string, email: string, password: string, role: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(userCredential.user, { displayName: name });
-    // You can also save "role" in Firestore if needed
-    return userCredential;
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is stored in localStorage (for demo purposes)
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+    setIsLoading(false);
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      // demo user, ganti pake API
+      const mockUser: User = {
+        id: '1',
+        name: 'Demo User',
+        email: email,
+        role: 'parent',
+      };
+      
+      setUser(mockUser);
+      localStorage.setItem('user', JSON.stringify(mockUser));
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const login = (email: string, password: string) => {
-    return signInWithEmailAndPassword(auth, email, password);
+  const register = async (name: string, email: string, password: string, role: 'admin' | 'parent' | 'teacher' | 'student' | 'guest', nisn?: string) => {
+    setIsLoading(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // Save user data to Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        name,
+        email,
+        role,
+        nisn: role === "student" ? nisn : null,
+        createdAt: new Date(),
+      });
+
+      setUser({ id: user.uid, name, email, role });
+      localStorage.setItem("user", JSON.stringify({ id: user.uid, name, email, role }));
+    } catch (error) {
+      console.error("Registration error:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = () => {
-    return signOut(auth);
+    setUser(null);
+    localStorage.removeItem('user');
   };
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setLoading(false);
-    });
-
-    return unsubscribe;
-  }, []);
-
-  const value = { currentUser, register, login, logout };
-
   return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
+    <AuthContext.Provider value={{ 
+      user, 
+      isAuthenticated: !!user, 
+      isLoading, 
+      login, 
+      register, 
+      logout 
+    }}>
+      {children}
     </AuthContext.Provider>
   );
 };
