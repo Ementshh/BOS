@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
   createUserWithEmailAndPassword,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -138,6 +139,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           certifications: teacherInfo.certifications || [],
           createdAt: new Date(),
         });
+
+        await sendEmailVerification(user);
       } else if (role === 'parent') {
         // Save parent data to the "parent" collection
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -150,6 +153,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           role,
           createdAt: new Date(),
         });
+
+        await sendEmailVerification(user);
       } else {
         // Save other roles to the "users" collection
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -162,6 +167,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           role,
           createdAt: new Date(),
         });
+
+        await sendEmailVerification(user);
       }
   
       setUser({ id: uid, name, email, role });
