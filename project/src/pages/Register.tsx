@@ -44,6 +44,7 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
     if (!name || !email || !password || !confirmPassword) {
       setError('Please fill in all required fields');
       return;
@@ -75,9 +76,19 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // Debugging log for data being sent
+      console.log('Registering user with:', {
+        name,
+        email,
+        role,
+        nisn,
+        teacherInfo: role === 'teacher' ? teacherInfo : undefined,
+      });
+
       await register(name, email, password, role, nisn, role === 'teacher' ? teacherInfo : undefined);
       navigate('/');
     } catch (err) {
+      console.error('Registration error:', err);
       setError(err instanceof Error ? err.message : 'Failed to create account');
     } finally {
       setIsLoading(false);

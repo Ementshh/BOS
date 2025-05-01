@@ -1,10 +1,11 @@
+// src/contexts/AuthContext.tsx
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
   updateProfile,
+  onAuthStateChanged,
 } from 'firebase/auth';
 import { auth, db } from '../firebase'; 
 import { doc, setDoc } from "firebase/firestore";
@@ -13,18 +14,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'parent' | 'teacher' | 'student' | 'guest';
-}
-
-interface TeacherInfo {
-  schoolName: string;
-  teacherId: string;
-  department: string;
-  district: string;
-  subjects: string[];
-  gradeLevels: string[]; // Must be an array of strings
-  yearsExperience: number;
-  certifications: string[];
+  role:  | 'parent' | 'teacher'  | 'student';
 }
 
 interface AuthContextType {
@@ -32,14 +22,16 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (
-    name: string,
-    email: string,
-    password: string,
-    role: 'admin' | 'parent' | 'teacher' | 'student' | 'guest',
-    nisn?: string,
-    teacherInfo?: TeacherInfo
-  ) => Promise<void>;
+  register: (name: string, email: string, password: string, role:  | 'parent' | 'teacher' | 'student' , nisn?: string, teacherInfo?: {
+    schoolName: string;
+    teacherId: string;
+    department: string;
+    district: string;
+    subjects: string[];
+    gradeLevels: string[];
+    yearsExperience: number;
+    certifications: string[];
+  }) => Promise<void>;
   logout: () => void;
 }
 
@@ -58,41 +50,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-          setUser(JSON.parse(storedUser));
-        } else {
-          const name = firebaseUser.displayName || "Unnamed";
-          const email = firebaseUser.email || "";
-          const role = 'parent'; // Default role, OR fetch from Firestore if needed
-
-          const user: User = {
-            id: firebaseUser.uid,
-            name,
-            email,
-            role,
-          };
-
-          setUser(user);
-          localStorage.setItem("user", JSON.stringify(user));
-        }
-      } else {
-        setUser(null);
-        localStorage.removeItem("user");
-      }
-      setIsLoading(false);
-    });
-
-    return unsubscribe;
+    // Check if user is stored in localStorage (for demo purposes)
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+    setIsLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // The listener in useEffect will handle setting user
+      // demo user, ganti pake API
+      const mockUser: User = {
+        id: '1',
+        name: 'Demo User',
+        email: email,
+        role: 'parent',
+      };
+      
+      setUser(mockUser);
+      localStorage.setItem('user', JSON.stringify(mockUser));
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -105,25 +83,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     name: string,
     email: string,
     password: string,
-    role: 'admin' | 'parent' | 'teacher' | 'student' | 'guest',
+    role:  | 'parent' | 'teacher' | 'student' ,
     nisn?: string,
-    teacherInfo?: TeacherInfo
+    teacherInfo?: {
+      schoolName: string;
+      teacherId: string;
+      department: string;
+      district: string;
+      subjects: string[];
+      gradeLevels: string[];
+      yearsExperience: number;
+      certifications: string[];
+    }
   ) => {
     setIsLoading(true);
     try {
       if (role === 'student' && !nisn) {
         throw new Error("NISN is required for student registration.");
       }
-
+  
       let uid: string;
-
+  
       if (role === 'student') {
+        // Save student data to the "students" collection
         const docRef = doc(db, "students", nisn ?? crypto.randomUUID());
         await setDoc(docRef, {
           name,
-          email,
           role,
           nisn,
+          email,
           createdAt: new Date(),
         });
         uid = docRef.id;
@@ -131,31 +119,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!teacherInfo || !teacherInfo.schoolName || !teacherInfo.teacherId) {
           throw new Error("Teacher information is incomplete.");
         }
-
+      
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         uid = user.uid;
-
-        await setDoc(doc(db, "teachers", uid), {
+      
+        await setDoc(doc(db, "teacher", uid), {
           name,
           email,
           role,
-          ...teacherInfo,
+          schoolName: teacherInfo.schoolName,
+          teacherId: teacherInfo.teacherId,
+          department: teacherInfo.department || '',
+          district: teacherInfo.district || '',
+          subjects: teacherInfo.subjects || [],
+          gradeLevels: teacherInfo.gradeLevels || [],
+          yearsExperience: teacherInfo.yearsExperience || 0,
+          certifications: teacherInfo.certifications || [],
           createdAt: new Date(),
         });
-      } else {
+      } else if (role === 'parent') {
+        // Save parent data to the "parent" collection
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
         uid = user.uid;
-
-        await setDoc(doc(db, role === 'parent' ? "parents" : "users", uid), {
+  
+        await setDoc(doc(db, "parent", uid), {
+          name,
+          email,
+          role,
+          createdAt: new Date(),
+        });
+      } else {
+        // Save other roles to the "users" collection
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        uid = user.uid;
+  
+        await setDoc(doc(db, "users", uid), {
           name,
           email,
           role,
           createdAt: new Date(),
         });
       }
-
+  
       setUser({ id: uid, name, email, role });
       localStorage.setItem("user", JSON.stringify({ id: uid, name, email, role }));
     } catch (error) {
@@ -165,21 +173,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     }
   };
+  
 
-  const logout = async () => {
-    await signOut(auth);
+  const logout = () => {
     setUser(null);
-    localStorage.removeItem("user");
+    localStorage.removeItem('user');
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      isAuthenticated: !!user,
-      isLoading,
-      login,
-      register,
-      logout
+    <AuthContext.Provider value={{ 
+      user, 
+      isAuthenticated: !!user, 
+      isLoading, 
+      login, 
+      register, 
+      logout 
     }}>
       {children}
     </AuthContext.Provider>
