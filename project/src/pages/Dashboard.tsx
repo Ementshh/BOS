@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useReducer } from 'react';
 import FundAllocationChart from '../components/dashboard/FundAllocationChart';
 import FundUsageDonut from '../components/dashboard/FundUsageDonut';
 import SchoolsTable from '../components/dashboard/SchoolsTable';
 import { BarChart3, Search, Bell, PieChart, Filter, Download } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+
+const { user } = useAuth();
 
 const Dashboard: React.FC = () => {
   // Mock data for the charts and tables

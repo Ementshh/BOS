@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.tsx
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -41,34 +41,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is stored in localStorage (for demo purposes)
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const token = await firebaseUser.getIdToken();
+        const name = firebaseUser.displayName || "Unnamed";
+        const email = firebaseUser.email || "";
+        const role = 'parent'; // or fetch from Firestore
+        
+        const user: User = {
+          id: firebaseUser.uid,
+          name,
+          email,
+          role,
+        };
+  
+        setUser(user);
+        localStorage.setItem("user", JSON.stringify(user));
+      } else {
+        setUser(null);
+        localStorage.removeItem("user");
+      }
+      setIsLoading(false);
+    });
+  
+    return unsubscribe;
+  }, []);  
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // demo user, ganti pake API
-      const mockUser: User = {
-        id: '1',
-        name: 'Demo User',
-        email: email,
-        role: 'parent',
-      };
-      
-      setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
+      await signInWithEmailAndPassword(auth, email, password);
+      // The listener in useEffect will handle setting user
     } catch (error) {
       console.error('Login error:', error);
       throw error;
     } finally {
       setIsLoading(false);
     }
-  };
+  };  
 
   const register = async (name: string, email: string, password: string, role: 'admin' | 'parent' | 'teacher' | 'student' | 'guest', nisn?: string) => {
     setIsLoading(true);
@@ -95,10 +105,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await signOut(auth);
     setUser(null);
-    localStorage.removeItem('user');
+    localStorage.removeItem("user");
   };
+  
 
   return (
     <AuthContext.Provider value={{ 
