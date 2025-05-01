@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.tsx
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -7,45 +7,189 @@ import {
   updateProfile,
   onAuthStateChanged,
 } from 'firebase/auth';
-import { auth } from '../firebase'; // <- you need to create this file
+import { auth, db } from '../firebase'; 
+import { doc, setDoc } from "firebase/firestore";
 
-const AuthContext = createContext<any>(null);
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role:  | 'parent' | 'teacher'  | 'student';
+}
 
-export const useAuth = () => useContext(AuthContext);
+interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role:  | 'parent' | 'teacher' | 'student' , nisn?: string, teacherInfo?: {
+    schoolName: string;
+    teacherId: string;
+    department: string;
+    district: string;
+    subjects: string[];
+    gradeLevels: string[];
+    yearsExperience: number;
+    certifications: string[];
+  }) => Promise<void>;
+  logout: () => void;
+}
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-  const register = async (name: string, email: string, password: string, role: string) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(userCredential.user, { displayName: name });
-    // You can also save "role" in Firestore if needed
-    return userCredential;
-  };
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
-  const login = (email: string, password: string) => {
-    return signInWithEmailAndPassword(auth, email, password);
-  };
-
-  const logout = () => {
-    return signOut(auth);
-  };
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setLoading(false);
-    });
-
-    return unsubscribe;
+    // Check if user is stored in localStorage (for demo purposes)
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+    setIsLoading(false);
   }, []);
 
-  const value = { currentUser, register, login, logout };
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      // demo user, ganti pake API
+      const mockUser: User = {
+        id: '1',
+        name: 'Demo User',
+        email: email,
+        role: 'parent',
+      };
+      
+      setUser(mockUser);
+      localStorage.setItem('user', JSON.stringify(mockUser));
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const register = async (
+    name: string,
+    email: string,
+    password: string,
+    role:  | 'parent' | 'teacher' | 'student' ,
+    nisn?: string,
+    teacherInfo?: {
+      schoolName: string;
+      teacherId: string;
+      department: string;
+      district: string;
+      subjects: string[];
+      gradeLevels: string[];
+      yearsExperience: number;
+      certifications: string[];
+    }
+  ) => {
+    setIsLoading(true);
+    try {
+      if (role === 'student' && !nisn) {
+        throw new Error("NISN is required for student registration.");
+      }
+  
+      let uid: string;
+  
+      if (role === 'student') {
+        // Save student data to the "students" collection
+        const docRef = doc(db, "students", nisn ?? crypto.randomUUID());
+        await setDoc(docRef, {
+          name,
+          role,
+          nisn,
+          email,
+          createdAt: new Date(),
+        });
+        uid = docRef.id;
+      } else if (role === 'teacher') {
+        if (!teacherInfo || !teacherInfo.schoolName || !teacherInfo.teacherId) {
+          throw new Error("Teacher information is incomplete.");
+        }
+      
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        uid = user.uid;
+      
+        await setDoc(doc(db, "teacher", uid), {
+          name,
+          email,
+          role,
+          schoolName: teacherInfo.schoolName,
+          teacherId: teacherInfo.teacherId,
+          department: teacherInfo.department || '',
+          district: teacherInfo.district || '',
+          subjects: teacherInfo.subjects || [],
+          gradeLevels: teacherInfo.gradeLevels || [],
+          yearsExperience: teacherInfo.yearsExperience || 0,
+          certifications: teacherInfo.certifications || [],
+          createdAt: new Date(),
+        });
+      } else if (role === 'parent') {
+        // Save parent data to the "parent" collection
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        uid = user.uid;
+  
+        await setDoc(doc(db, "parent", uid), {
+          name,
+          email,
+          role,
+          createdAt: new Date(),
+        });
+      } else {
+        // Save other roles to the "users" collection
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        uid = user.uid;
+  
+        await setDoc(doc(db, "users", uid), {
+          name,
+          email,
+          role,
+          createdAt: new Date(),
+        });
+      }
+  
+      setUser({ id: uid, name, email, role });
+      localStorage.setItem("user", JSON.stringify({ id: uid, name, email, role }));
+    } catch (error) {
+      console.error("Registration error:", error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+  };
 
   return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
+    <AuthContext.Provider value={{ 
+      user, 
+      isAuthenticated: !!user, 
+      isLoading, 
+      login, 
+      register, 
+      logout 
+    }}>
+      {children}
     </AuthContext.Provider>
   );
 };
