@@ -1,11 +1,14 @@
-import React from 'react';
+//import React, { useReducer } from 'react';
 import FundAllocationChart from '../components/dashboard/FundAllocationChart';
 import FundUsageDonut from '../components/dashboard/FundUsageDonut';
 import SchoolsTable from '../components/dashboard/SchoolsTable';
-import { BarChart3, Search, Bell, PieChart, Filter, Download } from 'lucide-react';
+import { BarChart3, Filter, Download } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+
+
 
 const Dashboard: React.FC = () => {
-  // Mock data for the charts and tables
+  const { user } = useAuth();
   const allocationData = [
     { name: 'SD Negeri 1', allocated: 350000000, used: 280000000, remaining: 70000000 },
     { name: 'SMP Negeri 3', allocated: 420000000, used: 310000000, remaining: 110000000 },

@@ -13,12 +13,13 @@ import NotFound from './pages/NotFound';
 
 // Protected route wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuth();
-  
-  if (!isAuthenticated) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null; // or loading spinner
+
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 };
 
