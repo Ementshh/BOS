@@ -84,7 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     name: string,
     email: string,
     password: string,
-    role:  | 'parent' | 'teacher' | 'student' ,
+    role: 'parent' | 'teacher' | 'student',
     nisn?: string,
     teacherInfo?: {
       schoolName: string;
@@ -105,26 +105,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
       let uid: string;
   
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      uid = user.uid;
+  
       if (role === 'student') {
-        // Save student data to the "students" collection
-        const docRef = doc(db, "students", nisn ?? crypto.randomUUID());
-        await setDoc(docRef, {
+        await setDoc(doc(db, "students", uid), {
           name,
-          role,
-          nisn,
           email,
+          nisn,
+          role,
           createdAt: new Date(),
         });
-        uid = docRef.id;
       } else if (role === 'teacher') {
         if (!teacherInfo || !teacherInfo.schoolName || !teacherInfo.teacherId) {
           throw new Error("Teacher information is incomplete.");
         }
-      
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        uid = user.uid;
-      
+  
         await setDoc(doc(db, "teacher", uid), {
           name,
           email,
@@ -139,37 +136,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           certifications: teacherInfo.certifications || [],
           createdAt: new Date(),
         });
-
-        await sendEmailVerification(user);
       } else if (role === 'parent') {
-        // Save parent data to the "parent" collection
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        uid = user.uid;
-  
         await setDoc(doc(db, "parent", uid), {
           name,
           email,
           role,
           createdAt: new Date(),
         });
-
-        await sendEmailVerification(user);
       } else {
-        // Save other roles to the "users" collection
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        uid = user.uid;
-  
         await setDoc(doc(db, "users", uid), {
           name,
           email,
           role,
           createdAt: new Date(),
         });
-
-        await sendEmailVerification(user);
       }
+  
+      await sendEmailVerification(user);
   
       setUser({ id: uid, name, email, role });
       localStorage.setItem("user", JSON.stringify({ id: uid, name, email, role }));
@@ -180,6 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(false);
     }
   };
+  
   
 
   const logout = () => {
