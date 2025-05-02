@@ -1,5 +1,12 @@
-import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import React from "react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  Legend,
+} from "recharts";
 
 interface FundUsageDonutProps {
   data: {
@@ -27,7 +34,7 @@ const renderCustomizedLabel = ({
       x={x}
       y={y}
       fill="white"
-      textAnchor={x > cx ? 'start' : 'end'}
+      textAnchor={x > cx ? "start" : "end"}
       dominantBaseline="central"
     >
       {`${(percent * 100).toFixed(0)}%`}
@@ -40,7 +47,14 @@ const FundUsageDonut: React.FC<FundUsageDonutProps> = ({ data }) => {
     <div className="bg-white rounded-lg shadow-md p-4 h-72">
       <h3 className="text-lg font-semibold mb-4">BOS Fund Usage Categories</h3>
       <ResponsiveContainer width="100%" height="85%">
-        <PieChart>
+        <PieChart
+          margin={{
+            top: 40,
+            right: 0,
+            bottom: 0,
+            left: 0,
+          }}
+        >
           <Pie
             data={data}
             cx="50%"
@@ -56,12 +70,18 @@ const FundUsageDonut: React.FC<FundUsageDonutProps> = ({ data }) => {
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number) => new Intl.NumberFormat('id-ID', {
-              style: 'currency',
-              currency: 'IDR',
-            }).format(value)}
+            formatter={(value: number) =>
+              new Intl.NumberFormat("id-ID", {
+                style: "currency",
+                currency: "IDR",
+              }).format(value)
+            }
           />
-          <Legend />
+          <Legend
+            verticalAlign="bottom"
+            align="center"
+            wrapperStyle={{ paddingTop: 40 }}
+          />
         </PieChart>
       </ResponsiveContainer>
     </div>

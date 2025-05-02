@@ -1,4 +1,3 @@
-
 import FundAllocationChart from "../components/dashboard/FundAllocationChart";
 import FundUsageDonut from "../components/dashboard/FundUsageDonut";
 import SchoolsTable from "../components/dashboard/SchoolsTable";
